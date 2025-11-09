@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scroll Image Sequence Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #000;
+            color: #fff;
+            overflow-x: hidden;
+        }
+
+        /* Hero Section with Scroll Sequence */
+        .sequence-section {
+            height: 400vh;
+            position: relative;
+            background: #000;
+        }
+
+        .sequence-container {
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        #sequenceCanvas {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .sequence-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .sequence-overlay h1 {
+            font-size: clamp(2rem, 8vw, 5rem);
+            font-weight: 700;
+            margin-bottom: 1rem;
+            text-shadow: 2px 2px 20px rgba(0,0,0,0.8);
+        }
+
+        .sequence-overlay p {
+            font-size: clamp(1rem, 2vw, 1.5rem);
+            opacity: 0.9;
+            text-shadow: 1px 1px 10px rgba(0,0,0,0.8);
+        }
+
+        /* Loading Screen */
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.5s ease;
+        }
+
+        .loading-screen.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .loader {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #333;
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            margin-top: 20px;
+            font-size: 1.2rem;
+        }
+
+        .loading-progress {
+            margin-top: 10px;
+            font-size: 0.9rem;
+            color: #888;
+        }
+
+        /* Content Section */
+        .content-section {
+            min-height: 100vh;
+            padding: 100px 20px;
+            background: linear-gradient(to bottom, #000, #111);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .content-wrapper {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .content-wrapper h2 {
+            font-size: clamp(2rem, 5vw, 3rem);
+            margin-bottom: 2rem;
+        }
+
+        .content-wrapper p {
+            font-size: clamp(1rem, 2vw, 1.2rem);
+            line-height: 1.8;
+            color: #ccc;
+            margin-bottom: 1.5rem;
+        }
+
+        /* Instructions */
+        .instructions {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            padding: 15px 20px;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            z-index: 100;
+            animation: fadeIn 1s ease 2s both;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (max-width: 768px) {
+            .instructions {
+                bottom: 10px;
+                right: 10px;
+                left: 10px;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div class="loading-screen" id="loadingScreen">
+        <div class="loader"></div>
+        <div class="loading-text">Loading Experience</div>
+        <div class="loading-progress" id="loadingProgress">0%</div>
+    </div>
+
+    <!-- Scroll Instructions -->
+    <div class="instructions">
+        ↓ Scroll down to animate ↓
+    </div>
+
+    <!-- Sequence Section -->
+    <section class="sequence-section" id="sequenceSection">
+        <div class="sequence-container">
+            <canvas id="sequenceCanvas"></canvas>
+            <div class="sequence-overlay">
+                <h1>Scroll to Explore</h1>
+                <p>Experience the magic of motion</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Content Section -->
+    <section class="content-section">
+        <div class="content-wrapper">
+            <h2>How This Works</h2>
+            <p>
+                This scroll-triggered image sequence creates a cinematic experience as you navigate through the page. 
+                Each frame is synchronized with your scroll position, creating smooth, frame-by-frame animation.
+            </p>
+            <p>
+                This demo uses procedurally generated frames, but you can replace them with your own image sequence. 
+                Simply upload your frames to a hosting service and update the image URLs in the code.
+            </p>
+            <p>
+                Perfect for product reveals, storytelling, and creating engaging landing pages that captivate your audience.
+            </p>
+        </div>
+    </section>
+
+    <script>
+        // Configuration
+        const canvas = document.getElementById('sequenceCanvas');
+        const ctx = canvas.getContext('2d');
+        const totalFrames = 60;
+        const images = [];
+        let imagesLoaded = 0;
+        let currentFrame = 0;
+
+        // Set canvas size
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            if (images[currentFrame]) {
+                drawFrame(currentFrame);
+            }
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Generate demo frames (replace this with your actual images)
+        function generateDemoFrame(frameNumber) {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = 1920;
+            tempCanvas.height = 1080;
+            const tempCtx = tempCanvas.getContext('2d');
+
+            // Create gradient background
+            const gradient = tempCtx.createRadialGradient(960, 540, 0, 960, 540, 960);
+            const hue = (frameNumber / totalFrames) * 360;
+            gradient.addColorStop(0, `hsl(${hue}, 70%, 50%)`);
+            gradient.addColorStop(1, `hsl(${(hue + 60) % 360}, 50%, 20%)`);
+            tempCtx.fillStyle = gradient;
+            tempCtx.fillRect(0, 0, 1920, 1080);
+
+            // Add animated circle
+            const radius = 50 + (frameNumber / totalFrames) * 400;
+            tempCtx.beginPath();
+            tempCtx.arc(960, 540, radius, 0, Math.PI * 2);
+            tempCtx.fillStyle = `rgba(255, 255, 255, ${0.8 - (frameNumber / totalFrames) * 0.6})`;
+            tempCtx.fill();
+
+            // Add frame number
+            tempCtx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            tempCtx.font = 'bold 120px Arial';
+            tempCtx.textAlign = 'center';
+            tempCtx.textBaseline = 'middle';
+            tempCtx.fillText(`${frameNumber + 1}`, 960, 540);
+
+            return tempCanvas;
+        }
+
+        // Preload images
+        function preloadImages() {
+            for (let i = 0; i < totalFrames; i++) {
+                const img = new Image();
+                
+                // REPLACE THIS SECTION WITH YOUR IMAGE URLS
+                // Example: img.src = `https://your-domain.com/images/frame_${String(i + 1).padStart(4, '0')}.jpg`;
+                const demoCanvas = generateDemoFrame(i);
+                img.src = demoCanvas.toDataURL();
+                
+                img.onload = () => {
+                    imagesLoaded++;
+                    const progress = Math.round((imagesLoaded / totalFrames) * 100);
+                    document.getElementById('loadingProgress').textContent = `${progress}%`;
+                    
+                    if (imagesLoaded === totalFrames) {
+                        setTimeout(() => {
+                            document.getElementById('loadingScreen').classList.add('hidden');
+                            drawFrame(0);
+                        }, 500);
+                    }
+                };
+                
+                images.push(img);
+            }
+        }
+
+        // Draw frame on canvas
+        function drawFrame(frameIndex) {
+            if (!images[frameIndex]) return;
+            
+            const img = images[frameIndex];
+            const canvasAspect = canvas.width / canvas.height;
+            const imgAspect = img.width / img.height;
+            
+            let drawWidth, drawHeight, offsetX, offsetY;
+            
+            if (canvasAspect > imgAspect) {
+                drawWidth = canvas.width;
+                drawHeight = canvas.width / imgAspect;
+                offsetX = 0;
+                offsetY = (canvas.height - drawHeight) / 2;
+            } else {
+                drawHeight = canvas.height;
+                drawWidth = canvas.height * imgAspect;
+                offsetX = (canvas.width - drawWidth) / 2;
+                offsetY = 0;
+            }
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+            currentFrame = frameIndex;
+        }
+
+        // Handle scroll
+        function handleScroll() {
+            const section = document.getElementById('sequenceSection');
+            const rect = section.getBoundingClientRect();
+            const sectionHeight = section.offsetHeight;
+            const viewportHeight = window.innerHeight;
+            
+            const scrollRange = sectionHeight - viewportHeight;
+            const scrollProgress = Math.max(0, Math.min(1, -rect.top / scrollRange));
+            
+            const frameIndex = Math.min(
+                totalFrames - 1,
+                Math.floor(scrollProgress * totalFrames)
+            );
+            
+            if (frameIndex !== currentFrame && images[frameIndex]) {
+                requestAnimationFrame(() => drawFrame(frameIndex));
+            }
+        }
+
+        // Initialize
+        window.addEventListener('scroll', handleScroll);
+        preloadImages();
+    </script>
+</body>
+</html>
